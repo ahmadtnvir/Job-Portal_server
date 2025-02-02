@@ -1,7 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const jwt = require("jsonwebtoken"); //! JWT-------------------
+// const jwt = require("jsonwebtoken"); //! JWT-------------------
+const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser"); //! CookieParser-------------------
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -57,7 +58,13 @@ async function run() {
     //     .send({ success: true });
     //   // res.send(token);
     // });
-    
+    // ! 60.2 ->
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, "secret", { expiresIn: "1h" });
+      res.send(token);
+      // ! 60.2 <-
+    });
 
     //! remove the JWT token from the cookie
     app.post("/logout", (req, res) => {
