@@ -1,13 +1,23 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken"); //! JWT-------------------
+const cookieParser = require("cookie-parser"); //! CookieParser-------------------
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 // import ObjectId from "mongodb"
 
-app.use(cors());
+//! This code sets up CORS (Cross-Origin Resource Sharing) middleware in an Express.js server. It configures the server to allow requests from a specific origin (http://localhost:5173) and includes credentials like cookies or authentication headers in those requests.
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
+//!-------------------------------------
 app.use(express.json());
+app.use(cookieParser()); //! Cookie parser middleware----------------
 
 // !MongoDB Connection Start
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.39hom9r.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -30,6 +40,45 @@ async function run() {
       .db("jobPortalDB")
       .collection("job_application");
 
+    //! Auth related APIs ------------------------------Start
+
+    //! Create the JWT token and send it to the client
+    // app.post("/jwt", async (req, res) => {
+    //   const user = req.body;
+    //   // const token = jwt.sign(user, "secret", { expiresIn: "1h" });
+    //   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+    //     expiresIn: "5h",
+    //   });
+    //   res
+    //     .cookie("token", token, {
+    //       httpOnly: true,
+    //       secure: false,
+    //     })
+    //     .send({ success: true });
+    //   // res.send(token);
+    // });
+    
+
+    //! remove the JWT token from the cookie
+    app.post("/logout", (req, res) => {
+      res
+        .clearCookie("token", {
+          httpOnly: true,
+          secure: false,
+        })
+        .send({ success: true });
+    });
+    //! Auth related APIs ------------------------------End
+
+    // app.get("/jobs", async (req, res) => {
+    //   const email = req.query.email;
+    //   let query = {};
+    //   if (email) {
+    //     query = { hr_email: email };
+    //   }
+    //   const jobs = await jobsDB.find(query).toArray();
+    //   res.send(jobs);
+    // });
     app.get("/jobs", async (req, res) => {
       const email = req.query.email;
       let query = {};
@@ -53,9 +102,25 @@ async function run() {
       res.send(jobs);
     });
 
+    // ! Find all jog applications
+    app.get("/job-applications", async (req, res) => {
+      const result = await jobsApplicationsDB.find().toArray();
+      res.send(result);
+    });
+
     app.get("/job-applications", async (req, res) => {
       const email = req.query.email;
       const query = { applicant_email: email };
+
+      console.log(req.cookies);
+
+      const result = await jobsApplicationsDB.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get("job-applications/jobs/:job_id", async (req, res) => {
+      const jobId = req.params.job_id;
+      const query = { job_id: jobId.id };
       const result = await jobsApplicationsDB.find(query).toArray();
       res.send(result);
     });
@@ -63,6 +128,24 @@ async function run() {
     app.post("/job-applications", async (req, res) => {
       const application = req.body;
       const applications = await jobsApplicationsDB.insertOne(application);
+      const id = application.job_id;
+      const query = { _id: new ObjectId(id) };
+      const job = await jobsDB.findOne(query);
+      // console.log(job);
+      let newCount = 0;
+      if (job.jobApplicationCount) {
+        newCount = job.jobApplicationCount + 1;
+      } else {
+        newCount = 1;
+      }
+      // Update
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          jobApplicationCount: newCount,
+        },
+      };
+      const updatedResult = await jobsDB.updateOne(filter, updatedDoc);
       res.send(applications);
     });
 
